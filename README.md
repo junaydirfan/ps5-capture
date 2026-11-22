@@ -16,6 +16,7 @@ capture card, a PS5 at 1080p, and a hybrid Intel + RTX 4080 laptop.
 | `ps5-fg` | 2× frame generation with lsfg-vk (30 → 60 fps). Smoother, but adds input lag |
 | `ps5-fg --hud` | Frame gen with an overlay that shows the real (generated) FPS |
 | `ps5 --untimed=no` | Perfectly even frame pacing, for up to one extra frame of lag |
+| `ps5 --discord` | Also creates a `ps5-mic` virtual mic (your mic + game audio) for Discord |
 
 Any other arguments are passed to `mpv` (e.g. `ps5 --no-fs`). Press `q` to quit.
 
@@ -64,6 +65,29 @@ which GPU drives which screen with:
 ```fish
 for c in /sys/class/drm/card*-*; test (cat $c/status) = connected; and echo (basename $c) (basename (readlink -f $c/../device/driver)); end
 ```
+
+## Streaming on Discord
+
+The official Discord client on Linux sends **no audio** with a screen share. It only
+records your mic. Workaround: `ps5 --discord` creates a virtual mic, **`ps5-mic`**, that
+mixes your real mic with the game audio, and removes it when you quit.
+
+1. Run `ps5 --discord` and go live in Discord as usual.
+2. In Discord **Settings → Voice & Video**, set **Input Device** to `ps5-mic`.
+3. In the same settings, turn off **Noise Suppression** and **Echo Cancellation**, or they
+   cut out game sound. With voice activity on, set Input Sensitivity low (or the game
+   gets gated). Push-to-talk mutes the game too.
+
+The game audio is sent through the voice channel, so everyone in the call hears it (mono,
+voice quality), not only stream viewers. Switch the input back to your mic afterwards.
+
+**Alternative: [Vesktop](https://github.com/Vencord/Vesktop)** (`sudo pacman -S vesktop-bin`).
+It can share real stream audio: pick `ps5-audio` in its audio picker. But its voice runs on
+Discord's web engine. On some networks, connecting to distant Discord voice servers gets
+stuck at "DTLS connecting", while nearby servers work. A voice channel **Region Override**
+to a nearby region can help. Vesktop ships Vencord, an unofficial client mod. That's against
+Discord's terms, though rarely enforced. If Vesktop hangs on its splash screen after a long
+break, rename `~/.config/vesktop/sessionData/vencordFiles` so it downloads a fresh copy.
 
 ## Frame generation (lsfg-vk 2.x)
 
