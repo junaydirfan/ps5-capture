@@ -31,7 +31,7 @@ On Arch/CachyOS: `sudo pacman -S mpv v4l-utils mangohud lsfg-vk`
 ## Install
 
 ```fish
-git clone <this repo> ~/ps5-capture
+git clone https://github.com/junaydirfan/ps5-capture ~/ps5-capture
 ln -s ~/ps5-capture/functions/*.fish ~/.config/fish/functions/
 ```
 
