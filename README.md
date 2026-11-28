@@ -13,7 +13,7 @@ capture card, a PS5 at 1080p, and a hybrid Intel + RTX 4080 laptop.
 |---|---|
 | `ps5` | Capture card fullscreen, lowest latency, audio on. **Use this to play.** |
 | `ps5 --hud` / `ps5-hud` | Same, with a MangoHud FPS/frametime overlay |
-| `ps5-fg` | 2× frame generation with lsfg-vk (30 → 60 fps). Smoother, but adds input lag |
+| `ps5-fg` | Frame generation with lsfg-vk for 30 fps games, evenly paced: picks 30 × N = your refresh rate (2× at 60 Hz, 8× at 240 Hz). Very smooth, ~30 ms more lag than `ps5` |
 | `ps5-fg --hud` | Frame gen with an overlay that shows the real (generated) FPS |
 | `ps5 --untimed=no` | Perfectly even frame pacing, for up to one extra frame of lag |
 | `ps5 --discord` | Also creates a `ps5-mic` virtual mic (your mic + game audio) for Discord |
@@ -25,7 +25,7 @@ Any other arguments are passed to `mpv` (e.g. `ps5 --no-fs`). Press `q` to quit.
 - fish, `mpv`, `v4l-utils`, PipeWire (`pw-loopback`, `pactl`)
 - A capture card that does **MJPEG** at your resolution (YUYV is usually too slow at 1080p)
 - Optional: `mangohud` for `--hud`
-- Optional: `lsfg-vk` 2.x and Lossless Scaling (Steam) for `ps5-fg`. See below.
+- Optional: `lsfg-vk` 2.x and Lossless Scaling (Steam) for `ps5-fg`, plus `jq` and KDE's `kscreen-doctor` to read your refresh rate (without them it uses 2×). See below.
 
 On Arch/CachyOS: `sudo pacman -S mpv v4l-utils mangohud lsfg-vk`
 
@@ -44,10 +44,10 @@ Set these once as universal variables. Only `PS5_CARD` is required.
 # Part of your capture card's name, as shown by `ls /dev/v4l/by-id/`
 set -Ux PS5_CARD UGREEN_15389
 
-# Optional: capture mode (defaults 1920x1080 and 30). Check yours with:
+# Optional: capture mode (defaults 1920x1080 and 60; many cards only do 30 at 1440p). Check yours with:
 #   v4l2-ctl -d /dev/v4l/by-id/<your card>-video-index0 --list-formats-ext
 set -Ux PS5_SIZE 1920x1080
-set -Ux PS5_FPS 30
+set -Ux PS5_FPS 60
 
 # Optional: which screen to go fullscreen on (names from `kscreen-doctor -o` or `xrandr`)
 set -Ux PS5_SCREEN eDP-1
@@ -116,7 +116,17 @@ through environment variables.
   change too. That's why the functions match devices by name.
 - **Frame gen pacing:** generated and real frames go out on back-to-back refreshes, so 2×
   only looks even at 60 Hz, or with a multiplier that fits the refresh rate (e.g. 4× at
-  120 Hz). lsfg-vk 2.0 has only two pacing modes: `vsync` and `none`.
+  120 Hz). lsfg-vk 2.0 has only two pacing modes: `vsync` and `none`. So `ps5-fg` picks the multiplier from
+  `PS5_SCREEN`'s refresh rate (8× at 240 Hz). Dropping the panel to 60 Hz for 2× also paces
+  evenly, but felt much laggier: every frame waits up to 16.7 ms for vsync instead of ~4 ms.
+- **Capture at 60 fps even for 30 fps games.** At 60 a 30 fps game arrives with each frame
+  twice (measured: ~half the frames are byte-identical), but every new frame lands within
+  ~16 ms instead of up to 33 ms, and an unevenly paced game frame isn't missed. `ps5-fg`
+  removes the repeats with `mpdecimate=max=1` (measured: 30.3 fps out, 133 of 135 gaps at
+  33 ms), so lsfg-vk interpolates between real frames.
+- **DLSS can't do this.** DLSS frame generation needs the game's own motion vectors and
+  depth, so it only works inside PC games that build it in. It can't run on a video feed
+  from a capture card. lsfg-vk (Lossless Scaling) is the tool that works on any image.
 
 ## Latency vs smoothness (measured)
 
@@ -129,9 +139,16 @@ logs and `v4l2-ctl`. Treat them as a guide.
 - **`ps5 --untimed=no`:** frames are scheduled from the card's timestamps, ±0.1–0.4 ms
   jitter, at the cost of buffering one frame (~33 ms). `--demuxer-readahead-secs=0` is
   essential here. Without it mpv buffers about 0.5 s.
-- **Frame gen:** the generation itself is cheap (~1 ms/frame on an RTX 4080), but
-  interpolation has to hold back a real frame. 2× and 4× felt too laggy for an action game.
-  It's nice for slower games or just watching.
+- **Frame gen:** the generation itself is cheap (~1 ms/frame on an RTX 4080), and
+  interpolation holds back one real frame (~33 ms at 30 fps).
+- **The big frame gen lag was a backlog, not the generation.** With frame gen on, mpv can't
+  present faster than frames arrive, so the ~0.5 s of frames that pile up while it starts
+  never drained. Measured frame age: 600 ms and growing (it felt like a second). Plain `ps5`
+  drains it in ~3 s and sits at ~21 ms. `scripts/ps5-catchup.lua` drops mpv's buffered frames
+  whenever the shown frame is over 100 ms old. That needs wall-clock frame timestamps
+  (`ts=abs`) and demuxer readahead, so the backlog sits in mpv, not the card's kernel queue.
+  `ps5-fg` frame age after the fix: median 49 ms, max 75 ms. `LSFGVK_OVERRIDE_PRESENT_MODE=mailbox`
+  and `LSFGVK_PACING_MODE=none` didn't help (none was worse), and 7× froze lsfg-vk at start.
 
 ## License
 

@@ -6,7 +6,8 @@ function ps5 --description 'Console capture card in mpv with low latency + audio
         return 1
     end
     set -l size 1920x1080; set -q PS5_SIZE; and set size $PS5_SIZE
-    set -l fps 30; set -q PS5_FPS; and set fps $PS5_FPS
+    # 60 even for 30 fps games: every new frame lands within ~16 ms (ps5-fg drops the repeats)
+    set -l fps 60; set -q PS5_FPS; and set fps $PS5_FPS
 
     # frame gen adds too much input lag for play; only ps5-fg (env profile) turns it on
     set -q LSFGVK_ENV; or set -lx DISABLE_LSFGVK 1
