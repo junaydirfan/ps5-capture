@@ -13,7 +13,7 @@ capture card, a PS5 at 1080p, and a hybrid Intel + RTX 4080 laptop.
 |---|---|
 | `ps5` | Capture card fullscreen, lowest latency, audio on. **Use this to play.** |
 | `ps5 --hud` / `ps5-hud` | Same, with a MangoHud FPS/frametime overlay |
-| `ps5-fg` | Frame generation with lsfg-vk for 30 fps games, evenly paced: picks 30 × N = your refresh rate (2× at 60 Hz, 8× at 240 Hz). Very smooth, ~30 ms more lag than `ps5` |
+| `ps5-fg` | Frame generation with lsfg-vk for 30 fps games, evenly paced: picks 30 × N = your refresh rate (2× at 60 Hz, 8× at 240 Hz). While it runs, switches `PS5_SCREEN` to the capture size at the same refresh and the power profile to performance (both restored on `q`). Very smooth, ~30 ms more lag than `ps5` |
 | `ps5-fg --hud` | Frame gen with an overlay that shows the real (generated) FPS |
 | `ps5 --untimed=no` | Perfectly even frame pacing, for up to one extra frame of lag |
 | `ps5 --discord` | Also creates a `ps5-mic` virtual mic (your mic + game audio) for Discord |
@@ -149,6 +149,11 @@ logs and `v4l2-ctl`. Treat them as a guide.
   (`ts=abs`) and demuxer readahead, so the backlog sits in mpv, not the card's kernel queue.
   `ps5-fg` frame age after the fix: median 49 ms, max 75 ms. `LSFGVK_OVERRIDE_PRESENT_MODE=mailbox`
   and `LSFGVK_PACING_MODE=none` didn't help (none was worse), and 7× froze lsfg-vk at start.
+- **Hybrid laptops heat-soak at 240 fps.** On the iGPU-wired panel at 2560×1600, after ~1 min
+  real frames fell from 30/s to 8/s (lag 200–350 ms) with the CPU at 97 °C and the dGPU
+  mostly idle: every generated frame is copied to the iGPU. Running the panel at 1080p (the
+  capture size) and the performance profile brought it to 23–25/s and 70–100 ms. The full
+  fix is the BIOS's discrete GPU mode (no copy at all), or a screen wired to the dGPU.
 
 ## License
 
