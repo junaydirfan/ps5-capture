@@ -25,6 +25,17 @@ function ps5-fg --description 'ps5 with lsfg-vk frame generation for 30 fps game
         set profile_back (powerprofilesctl get)
         test "$profile_back" != performance; and powerprofilesctl set performance; or set profile_back
     end
+    # put the screen mode and profile back once mpv is gone, even if this function is cut short
+    # (Ctrl+C, closed terminal): a detached watcher, since the end of the function may never run
+    set -l restore
+    test -n "$profile_back"; and set -a restore "powerprofilesctl set $profile_back"
+    test -n "$mode_back"; and set -a restore "kscreen-doctor output.$PS5_SCREEN.mode.$mode_back"
+    if set -q restore[1]
+        setsid fish -c "for i in (seq 60); pgrep -f '[m]pv av://v4l2' >/dev/null; and break; sleep 0.5; end
+            while pgrep -f '[m]pv av://v4l2' >/dev/null; sleep 1; end
+            "(string join '; ' $restore) >/dev/null 2>&1 &
+        disown
+    end
     # the card captures 60 fps, so a 30 fps game arrives with every frame twice; mpdecimate drops
     # the repeats (max=1: never two in a row) so lsfg-vk interpolates between real frames
     # ps5-catchup.lua drops the frame backlog that frame gen otherwise never drains (0.6 s+ of lag)
@@ -32,6 +43,4 @@ function ps5-fg --description 'ps5 with lsfg-vk frame generation for 30 fps game
     # LSFGVK_ENV=1 is required, otherwise lsfg-vk ignores the other LSFGVK_* variables
     LSFGVK_ENV=1 LSFGVK_MULTIPLIER=$mult LSFGVK_PACING_MODE=vsync ps5 --vf=mpdecimate=max=1 \
         --demuxer-lavf-o-append=ts=abs --demuxer-readahead-secs=2 --cache=yes --script=$catchup $argv
-    test -n "$profile_back"; and powerprofilesctl set $profile_back
-    test -n "$mode_back"; and kscreen-doctor output.$PS5_SCREEN.mode.$mode_back >/dev/null 2>&1
 end
